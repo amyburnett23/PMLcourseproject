@@ -1,0 +1,99 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "A.B. Cross"
+date: "May 29, 2018"
+output: html_document
+---
+
+This report was written with the following version of R:
+```{r}
+version
+```
+
+# Background (from assignment)
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+# Data (from assignment)
+The training data for this project are available here: [https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv]
+
+The test data are available here: [https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv]
+
+The data for this project come from this source: [http://groupware.les.inf.puc-rio.br/har]. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+# What you should submit (from assignment)
+The goal of your project is to predict the manner in which they did the exercise. This is the “classe” variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details.
+
+
+
+
+# Load the data
+```{r}
+test <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+train <-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+
+```
+Empty cells are replaced with NA to facilitate analysis.
+```{r}
+train <- train[, colSums(is.na(train)) == 0] 
+test <- test[, colSums(is.na(test)) == 0] 
+```
+The first 7 columns contained information on the user and not the excercise. These columns were removed as they would not assist in building a prediction model.
+```{r}
+train <- dplyr::select(train, -c(1:7))
+test <- dplyr::select(test, -c(1:7))
+```
+
+# Data Partitioning
+The datasets are now partitioned to make use of cross validation
+
+```{r}
+library(caret)
+trainPart <- createDataPartition(y = train$classe, p = 0.7, list = F)
+training <- train[trainPart,]
+testing <- train[-trainPart,]
+```
+
+#Model Building
+The Random Forests method is used to build up the prediction model. The model is then tested against our test set to build a confusion matrix
+```{r}
+library(randomForest)
+control <- trainControl(method = "cv", 5)
+rfModel <- train(classe ~ ., method = "rf", data = training, trControl = control, ntree = 150)
+rfModel
+```
+
+
+
+
+
+```{r}
+predictions <- predict(rfModel, testing)
+confusionMatrix(testing$classe, predictions)
+```
+
+The sample of error is then calculated to evaluate the performance of this model.
+
+```{r}
+cm <- table(testing$classe, predictions)
+1 - (sum(diag(cm))/ length(predictions))
+```
+
+The confusion matrix has shown that the random forests model created is satisfactory. The model is now used to predict the classe variable from the initial test set.
+```{r}
+answers <- predict(rfModel, test)
+answers
+
+pml_write_files <- function(x) {
+     n = length(x)
+     for(i in 1:n) {
+         filename <- paste0("problem_id_", i, ".txt")
+         write.table(x[i], file=filename, 
+                     quote=FALSE, row.names=FALSE, col.names=FALSE)
+     }
+ }
+
+pml_write_files(answers)
+```
